@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>IronLog — Workout Logger</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0a0a0a;--surface:#131313;--card:#1a1a1a;--border:#252525;
+      --text:#ffffff;--muted:#555;--orange:#ff6b2b;--orange-dim:rgba(255,107,43,.1);
+    }
+    body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    .app{max-width:900px;margin:0 auto;padding:44px 20px 80px}
+
+    /* Header */
+    header{margin-bottom:40px}
+    .logo{font-size:2.2rem;font-weight:900;letter-spacing:-2px;text-transform:uppercase}
+    .logo span{color:var(--orange)}
+    .sub{color:var(--muted);font-size:.85rem;margin-top:4px;letter-spacing:1px;text-transform:uppercase}
+
+    /* Stats */
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:36px}
+    @media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+    .stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px}
+    .stat-val{font-size:1.6rem;font-weight:800;letter-spacing:-1px}
+    .stat-val.hi{color:var(--orange)}
+    .stat-lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:3px}
+
+    /* New workout form */
+    .new-workout{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:28px}
+    .section-title{font-size:.7rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    input,select,textarea{background:var(--card);border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:.9rem;padding:10px 14px;border-radius:10px;outline:none;transition:border-color .2s}
+    input:focus,select:focus,textarea:focus{border-color:var(--orange)}
+    input::placeholder,textarea::placeholder{color:var(--muted)}
+    .input-grow{flex:1;min-width:140px}
+    .input-sm{width:80px}
+    .btn{font-weight:700;font-size:.85rem;padding:10px 20px;border-radius:10px;border:none;cursor:pointer;transition:opacity .2s,transform .1s;letter-spacing:.5px;text-transform:uppercase}
+    .btn:hover{opacity:.85;transform:translateY(-1px)}
+    .btn-orange{background:var(--orange);color:#fff}
+    .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+    .btn-ghost:hover{border-color:var(--orange);color:var(--orange)}
+    .btn-sm{padding:6px 12px;font-size:.75rem}
+
+    /* Exercise adder inside workout */
+    .exercise-adder{margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+
+    /* Workout cards */
+    .workouts{display:flex;flex-direction:column;gap:14px}
+    .wcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;animation:fadeUp .35s ease both}
+    .wcard-header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;cursor:pointer;border-bottom:1px solid var(--border)}
+    .wcard-header:hover{background:rgba(255,255,255,.02)}
+    .wname{font-weight:700;font-size:1rem}
+    .wdate{font-size:.78rem;color:var(--muted);margin-top:2px}
+    .wbadge{font-size:.72rem;background:var(--orange-dim);color:var(--orange);padding:4px 10px;border-radius:99px;font-weight:600}
+    .wcard-body{padding:18px 22px;display:none}
+    .wcard-body.open{display:block}
+
+    /* Exercise table */
+    .ex-table{width:100%;border-collapse:collapse;font-size:.88rem}
+    .ex-table th{text-align:left;color:var(--muted);font-size:.68rem;letter-spacing:2px;text-transform:uppercase;padding-bottom:10px;border-bottom:1px solid var(--border)}
+    .ex-table td{padding:10px 0;border-bottom:1px dashed var(--border)}
+    .ex-table tr:last-child td{border-bottom:none}
+    .ex-name{font-weight:600}
+    .ex-weight{color:var(--orange);font-weight:700}
+
+    /* PBs */
+    .pb-section{margin-top:32px}
+    .pb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:14px}
+    .pb-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+    .pb-exercise{font-size:.82rem;font-weight:600;margin-bottom:4px}
+    .pb-val{font-size:1.3rem;font-weight:800;color:var(--orange)}
+    .pb-sub{font-size:.72rem;color:var(--muted)}
+
+    .empty{text-align:center;padding:48px;color:var(--muted);font-style:italic}
+    .del-btn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.8rem;padding:4px 8px;border-radius:6px}
+    .del-btn:hover{color:#ef4444}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">Iron<span>Log</span></div>
+    <div class="sub">Track every rep. Break every record.</div>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat"><div class="stat-val hi" id="s-workouts">0</div><div class="stat-lbl">Workouts</div></div>
+    <div class="stat"><div class="stat-val hi" id="s-sets">0</div><div class="stat-lbl">Total Sets</div></div>
+    <div class="stat"><div class="stat-val" id="s-reps">0</div><div class="stat-lbl">Total Reps</div></div>
+    <div class="stat"><div class="stat-val" id="s-weight">0</div><div class="stat-lbl">Total kg Lifted</div></div>
+  </div>
+
+  <!-- New Workout -->
+  <div class="new-workout">
+    <div class="section-title">New Workout</div>
+    <div class="row" style="margin-bottom:10px">
+      <input class="input-grow" id="w-name" placeholder="Workout name (e.g. Push Day, Leg Day)"/>
+      <input type="date" id="w-date" style="width:160px"/>
+      <button class="btn btn-orange" onclick="createWorkout()">+ Log Workout</button>
+    </div>
+    <div id="new-exercises">
+      <div class="exercise-adder">
+        <div class="section-title">Add Exercises</div>
+        <div id="ex-rows"></div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="addExRow()">+ Add Exercise</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Workout List -->
+  <div class="section-title">Workout History</div>
+  <div id="workout-list" class="workouts">
+    <div class="empty">No workouts yet. Log your first session above!</div>
+  </div>
+
+  <!-- Personal Bests -->
+  <div class="pb-section">
+    <div class="section-title">Personal Bests 🏆</div>
+    <div id="pb-grid" class="pb-grid"></div>
+  </div>
+
+</div>
+<script>
+  let exRowCount = 0;
+
+  // Set default date to today
+  document.getElementById('w-date').value = new Date().toISOString().split('T')[0];
+
+  // Add initial exercise row
+  addExRow();
+
+  function addExRow() {
+    exRowCount++;
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.style.marginBottom = '8px';
+    div.id = 'exrow-' + exRowCount;
+    div.innerHTML = `
+      <input class="input-grow ex-name-in" placeholder="Exercise (e.g. Bench Press)"/>
+      <input class="input-sm ex-sets-in" type="number" placeholder="Sets" min="1"/>
+      <input class="input-sm ex-reps-in" type="number" placeholder="Reps" min="1"/>
+      <input class="input-sm ex-weight-in" type="number" placeholder="kg" min="0" step="0.5"/>
+      <button class="del-btn" onclick="document.getElementById('exrow-${exRowCount}').remove()">✕</button>`;
+    document.getElementById('ex-rows').appendChild(div);
+  }
+
+  const api = async (url, method='GET', body=null) => {
+    const opts = {method, headers:{'Content-Type':'application/json'}};
+    if (body) opts.body = JSON.stringify(body);
+    return (await fetch(url, opts)).json();
+  };
+
+  async function load() {
+    const [workouts, pbs, stats] = await Promise.all([
+      api('/api/workouts'), api('/api/pbs'), api('/api/stats')
+    ]);
+    renderWorkouts(workouts);
+    renderPBs(pbs);
+    renderStats(stats);
+  }
+
+  function renderStats(s) {
+    document.getElementById('s-workouts').textContent = s.total_workouts;
+    document.getElementById('s-sets').textContent     = s.total_sets;
+    document.getElementById('s-reps').textContent     = s.total_reps;
+    document.getElementById('s-weight').textContent   = s.total_weight_kg;
+  }
+
+  function renderWorkouts(workouts) {
+    const el = document.getElementById('workout-list');
+    if (!workouts.length) { el.innerHTML = '<div class="empty">No workouts yet. Log your first session above!</div>'; return; }
+    el.innerHTML = workouts.map(w => `
+      <div class="wcard">
+        <div class="wcard-header" onclick="toggleCard(${w.id})">
+          <div>
+            <div class="wname">${w.name}</div>
+            <div class="wdate">${formatDate(w.date)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="wbadge">${w.exercises.length} exercises</span>
+            <button class="del-btn" onclick="event.stopPropagation();deleteWorkout(${w.id})">✕</button>
+          </div>
+        </div>
+        <div class="wcard-body" id="wbody-${w.id}">
+          ${w.exercises.length ? `
+          <table class="ex-table">
+            <thead><tr><th>Exercise</th><th>Sets</th><th>Reps</th><th>Weight</th><th></th></tr></thead>
+            <tbody>
+              ${w.exercises.map(e => `
+              <tr>
+                <td class="ex-name">${e.name}</td>
+                <td>${e.sets}</td>
+                <td>${e.reps}</td>
+                <td class="ex-weight">${e.weight > 0 ? e.weight + ' ' + e.unit : '—'}</td>
+                <td><button class="del-btn" onclick="deleteExercise(${e.id})">✕</button></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>` : '<div style="color:var(--muted);font-style:italic;font-size:.9rem">No exercises logged.</div>'}
+          ${w.notes ? `<div style="margin-top:12px;font-size:.85rem;color:var(--muted);font-style:italic">${w.notes}</div>` : ''}
+        </div>
+      </div>`).join('');
+  }
+
+  function renderPBs(pbs) {
+    const el = document.getElementById('pb-grid');
+    if (!pbs.length) { el.innerHTML = '<div style="color:var(--muted);font-style:italic;font-size:.85rem">Log workouts to see your personal bests.</div>'; return; }
+    el.innerHTML = pbs.filter(p => p.max_weight > 0).map(p => `
+      <div class="pb-card">
+        <div class="pb-exercise">${p.name}</div>
+        <div class="pb-val">${p.max_weight} ${p.unit}</div>
+        <div class="pb-sub">Best single lift</div>
+      </div>`).join('');
+  }
+
+  function toggleCard(id) {
+    const el = document.getElementById('wbody-' + id);
+    el.classList.toggle('open');
+  }
+
+  async function createWorkout() {
+    const name = document.getElementById('w-name').value.trim();
+    const date = document.getElementById('w-date').value;
+    if (!name) { alert('Please enter a workout name.'); return; }
+
+    const res = await api('/api/workouts', 'POST', {name, date});
+    const wid = res.id;
+
+    // Add all exercise rows
+    const rows = document.querySelectorAll('#ex-rows .row');
+    for (const row of rows) {
+      const ename  = row.querySelector('.ex-name-in').value.trim();
+      const sets   = parseInt(row.querySelector('.ex-sets-in').value);
+      const reps   = parseInt(row.querySelector('.ex-reps-in').value);
+      const weight = parseFloat(row.querySelector('.ex-weight-in').value) || 0;
+      if (ename && sets && reps) {
+        await api('/api/workouts/' + wid + '/exercises', 'POST', {name: ename, sets, reps, weight});
+      }
+    }
+
+    // Reset form
+    document.getElementById('w-name').value = '';
+    document.getElementById('ex-rows').innerHTML = '';
+    exRowCount = 0;
+    addExRow();
+    await load();
+  }
+
+  async function deleteWorkout(id) {
+    if (!confirm('Delete this workout?')) return;
+    await api('/api/workouts/' + id, 'DELETE');
+    await load();
+  }
+
+  async function deleteExercise(id) {
+    await api('/api/exercises/' + id, 'DELETE');
+    await load();
+  }
+
+  function formatDate(d) {
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric'});
+  }
+
+  document.getElementById('w-name').addEventListener('keydown', e => { if (e.key === 'Enter') createWorkout(); });
+
+  load();
+</script>
+</body>
+</html>
